@@ -22,7 +22,7 @@ import scalaz.control.Kleisli
 import com.scapps.Routing._
 import com.scapps.OptionKleisli._
 
-object MyApps extends DropApp {
+class MyApps extends DropApp {
   import t.imps._
   import DropApp._
   import scalaz.OptionW.onull
@@ -57,36 +57,6 @@ object MyApps extends DropApp {
   }
 
   val routes: List[Route] = DropApp.mount("private", KGoApp) | TheLols
-}
-
-
-final class App extends StreamStreamServletApplication {
-  object App {
-    implicit val charSet = UTF8
-    import scalaz.OptionW.onull
-    import scalaz.javas.Iterator._
-
-    def drop(implicit request: Request[Stream], servletRequest: HttpServletRequest): Option[Response[Stream]] = {
-      respond(MyApps)
-    }
-
-    def respond(dropApp: DropApp)(implicit request: Request[Stream]) = {
-      def f(route: Route)(request: Request[Stream]): Option[Response[Stream]] = {
-        t.matchRoute(request.path.mkString)(route.parts) flatMap (m => route.f(ScappsRequest(m, request)))
-      }
-      val x: List[Kleisli[Option, Request[Stream], Response[Stream]]] = dropApp.routes map (f(_) _)
-      x(request)
-    }
-  }
-  import App._
-
-  val application = new ServletApplication[Stream, Stream] {
-    def application(implicit servlet: HttpServlet, servletRequest: HttpServletRequest, request: Request[Stream]) = {
-      // loads war resource if app doesn't respond to request
-      //quicklists getOrElse resource(x => OK << Stream.fromIterator(x), NotFound.xhtml)
-      drop getOrElse resource(x => OK << Stream.fromIterator(x), NotFound.xhtml)
-    }
-  }
 }
 
 
