@@ -10,17 +10,17 @@ import slinky.http.StreamStreamApplication._
 import slinky.http.{Application, ContentType}
 import slinky.http.response.xhtml.Doctype.{transitional, strict}
 import slinky.http.response._
-import xhtml.Doctype;
+import xhtml.Doctype
+import xml.Elem;
 import scalaz.CharSet._
 
 import com.scapps._
-import com.scapps.Routing._
-import com.scapps.OptionKleisli._
+import com.scapps.experimental.OptionKleisli._
 
 import scalaz.control.Kleisli
 
-import com.scapps.Routing._
-import com.scapps.OptionKleisli._
+import com.scapps.experimental.Routing._
+import com.scapps.experimental.OptionKleisli._
 
 class MyApps extends DropApp {
   import t.imps._
@@ -38,7 +38,6 @@ class MyApps extends DropApp {
     <body>{content}</body>
     </html>
 
-
   object KGoApp extends DropApp {
     val routes = List(
       Route(GET, "beers" / 'id, r => {
@@ -52,7 +51,9 @@ class MyApps extends DropApp {
 
   object TheLols extends DropApp {
     val routes = List(
-      Route(GET, "lols", r => r.render(view("Wat", "Scinatra? I barely knows ya!")))
+      Route(GET, "lols", r => {
+        r.render(view("Wat", "Scinatra? I barely knows ya!"))
+      })
       )
   }
 

@@ -1,4 +1,4 @@
-package com.scapps
+package com.scapps.experimental
 
 import scalaz.control.Kleisli
 import scalaz.{OptionW, StringW}
@@ -32,6 +32,7 @@ object Routing {
     }
     f(prefix) _
   }
+
 
   // returns a new request with the uri stripped to '/', if it matches exactly, else none
   def exactdir(s: String) = {
@@ -96,7 +97,6 @@ object RestfulRequest {
 /*
 /beers/1[/]
 /beers/2/reviews[/]
-
  */
 object ItemRequest {
   def RequestOptionItemRequest(request: Request[Stream]): Option[ItemRequest] = {
@@ -140,42 +140,42 @@ trait RestfulResource {
   }
 }
 
-class LoggingResource(resource : RestfulResource) extends RestfulResource {
+class LoggingResource(logF : (String => Unit), resource : RestfulResource) extends RestfulResource {
 
   val base: String = resource.base
 
   def index(r: Request[Stream]): Option[Response[Stream]] = {
-    System.out.println("index")
+    logF("index")
     resource.index(r)
   }
 
   def formForCreate(r: Request[Stream]): Option[Response[Stream]] = {
-    System.out.println("formForCreate")
+    logF("formForCreate")
     resource.formForCreate(r)
   }
 
   def createItem(r: Request[Stream]): Option[Response[Stream]] = {
-    System.out.println("createItem")
+    logF("createItem")
     resource.createItem(r)
   }
 
   def formForEdit(r: ItemRequest): Option[Response[Stream]] = {
-    System.out.println("formForEdit")
+    logF("formForEdit")
     resource.formForEdit(r)
   }
 
   def deleteItem(r: ItemRequest): Option[Response[Stream]] = {
-    System.out.println("deleteItem")
+    logF("deleteItem")
     resource.deleteItem(r)
   }
 
   def updateItem(r: ItemRequest): Option[Response[Stream]] = {
-    System.out.println("updateItem")
+    logF("updateItem")
     resource.updateItem(r)
   }
 
   def item(r: ItemRequest): Option[Response[Stream]] = {
-    System.out.println("item")
+    logF("item")
     resource.item(r)
   }
 }

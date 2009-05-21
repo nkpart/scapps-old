@@ -14,13 +14,11 @@ import xhtml.Doctype;
 import scalaz.CharSet._
 
 import com.scapps._
-import com.scapps.Routing._
-import com.scapps.OptionKleisli._
+import com.scapps.experimental.Routing._
+import com.scapps.experimental.OptionKleisli._
 
 import scalaz.control.Kleisli
 
-import com.scapps.Routing._
-import com.scapps.OptionKleisli._
 import slinky.http.request.Request
 
 final class ScappsApplication extends StreamStreamServletApplication {
@@ -31,7 +29,9 @@ final class ScappsApplication extends StreamStreamServletApplication {
 
     def respond(dropApp: DropApp)(implicit request: Request[Stream]) = {
       def f(route: Route)(request: Request[Stream]): Option[Response[Stream]] = {
-        t.matchRoute(request.path.mkString)(route.parts) flatMap (m => route.f(ScappsRequest(m, request)))
+        val matchMethod = OptionW.cond(route.m.equals(request.method), request)
+        val matchRoute = matchMethod flatMap (r => t.matchRoute(r.path.mkString)(route.parts))
+        matchRoute flatMap (m => route.f(ScappsRequest(m, request)))
       }
       val x: List[Kleisli[Option, Request[Stream], Response[Stream]]] = dropApp.routes map (f(_) _)
       x(request)
@@ -45,21 +45,19 @@ final class ScappsApplication extends StreamStreamServletApplication {
   val application = new ServletApplication[Stream, Stream] {
     def application(implicit servlet: HttpServlet, servletRequest: HttpServletRequest, request: Request[Stream]) = {
       if (a == null) {
-        val p = "com.scapps.MyApps" // TODO
-        if (p == null) {
+        val appName = servlet.servlet.getInitParameter("scapps-application")
+        if (appName == null) {
+          // TODO: make this really clear
           throw new RuntimeException("Set scapps app class plz.")
         }
-        val c = Class.forName(p)
+        val c = Class.forName(appName)
         if (classOf[DropApp] isAssignableFrom c) {
           a = c.newInstance.asInstanceOf[DropApp]
           //servlet.servlet.getServletConfig.get
         } else {
-          throw new RuntimeException("Bad class.")
+          throw new RuntimeException("Specified app class is not assignable from DropApp.")
         }
       }
-
-      // loads war resource if app doesn't respond to request
-      //quicklists getOrElse resource(x => OK << Stream.fromIterator(x), NotFound.xhtml)
       respond(a) getOrElse resource(x => OK << Stream.fromIterator(x), NotFound.xhtml)
     }
   }

@@ -15,13 +15,11 @@ import scalaz.CharSet._
 import scala.xml.{NodeSeq, Elem}
 
 import com.scapps._
-import com.scapps.Routing._
-import com.scapps.OptionKleisli._
 
 import scalaz.control.Kleisli
 
-import com.scapps.Routing._
-import com.scapps.OptionKleisli._
+import com.scapps.experimental.Routing._
+import com.scapps.experimental.OptionKleisli._
 
 object Renderer {
   implicit val charSet = UTF8
@@ -31,13 +29,17 @@ object Renderer {
   }
 
   def fourOhFour(implicit r: Request[Stream]) = {
-    NotFound(ContentType, "text/html") << strict << "404 - Not found"
+    NotFound(ContentType, "text/html") << transitional << "404 - Not found"
+  }
+
+  def respondWith(ct : String, content : String)(implicit r: Request[Stream]) = {
+    OK(ContentType, ct) << content
   }
 }
 
-abstract case class RoutePart
-case class Dir(s: String) extends RoutePart
-case class Any(name: Symbol) extends RoutePart
+abstract case class RoutePart()
+case class Dir(s: String) extends RoutePart()
+case class Any(name: Symbol) extends RoutePart()
 
 case class RouteLol(parts: List[RoutePart]) {
   def /(r: RoutePart) = {
@@ -66,7 +68,13 @@ object t {
     implicit def S2LRP(s: String): List[RoutePart] = List(Dir(s))
   }
 
-  def pathBits(path: String) = path.split("/").toList.filter(!_.isEmpty)
+  def pathBits(path: String) = {
+    val parts = path.split("/").toList.filter(!_.isEmpty)
+    parts match {
+      case List() => List("")
+      case x => x
+    }
+  }
 
   def f(part: String, routePart: RoutePart) = routePart match {
     case Dir(s) => cond(part.equals(s), None) //Some of None, if we found something, else None
@@ -78,7 +86,7 @@ object t {
     cond(x.length == parts.length, x) flatMap (bits => {
       val checked = bits.zip(parts) map Function.tupled(f)
       if (checked.forall(_.isDefined)) {
-        val l: List[Tuple2[Symbol, String]] = OptionW.somes(OptionW.somes(checked))
+        val l: List[(Symbol, String)] = OptionW.somes(OptionW.somes(checked))
         Some(Map.empty[Symbol, String] ++ l)
       } else {
         None
@@ -86,11 +94,13 @@ object t {
     })
   }
 }
-
+// "lists" / 'id
 case class ScappsRequest(captures: Map[Symbol, String], request: Request[Stream]) {
   implicit val r = request
 
   def render(a: Elem) = Renderer.render(a)
+
+  def respondWith(ct : String, content : String) = Renderer.respondWith(ct, content)
 }
 
 case class Route(m: Method, parts: List[RoutePart], f: (ScappsRequest => Option[Response[Stream]]))

@@ -58,5 +58,13 @@
          classpathref="project.classpath"
          />
   </target>
+
+  <target name="package" depends="compile">
+       <jar destfile="build/scapps.jar">
+           <fileset dir="build/classes"/>
+                    <!--excludes="**/Test.class"-->
+           <!--<fileset dir="${src}/resources"/>-->
+       </jar>
+  </target>
   
 </project>
