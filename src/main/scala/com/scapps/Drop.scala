@@ -1,7 +1,7 @@
 package com.scapps
 
-import scalaz.control._
-import scalaz.list.NonEmptyList
+import scalaz.Scalaz._
+import scalaz.NonEmptyList
 import scalaz.OptionW
 import slinky.http.request.{POST, Method, Request, GET}
 import slinky.http.servlet.{HttpServlet, HttpServletRequest, ServletApplication, StreamStreamServletApplication}
@@ -16,7 +16,8 @@ import scala.xml.{NodeSeq, Elem}
 
 import com.scapps._
 
-import scalaz.control.Kleisli
+import scalaz.Kleisli
+import scalaz.Kleisli._
 
 import com.scapps.experimental.Routing._
 import com.scapps.experimental.OptionKleisli._
@@ -77,16 +78,16 @@ object t {
   }
 
   def f(part: String, routePart: RoutePart) = routePart match {
-    case Dir(s) => cond(part.equals(s), None) //Some of None, if we found something, else None
+    case Dir(s) => part.equals(s).option(None) //Some of None, if we found something, else None
     case Any(n) => Some(Some(n -> part))
   }
 
   def matchRoute(path: String)(parts: List[RoutePart]): Option[Map[Symbol, String]] = {
     val x = pathBits(path)
-    cond(x.length == parts.length, x) flatMap (bits => {
+    (x.length == parts.length).option(x) flatMap (bits => {
       val checked = bits.zip(parts) map Function.tupled(f)
       if (checked.forall(_.isDefined)) {
-        val l: List[(Symbol, String)] = OptionW.somes(OptionW.somes(checked))
+        val l: List[(Symbol, String)] = checked.map(_ getOrElse None).foldLeft(List[(Symbol, String)]())(_ ++ _)
         Some(Map.empty[Symbol, String] ++ l)
       } else {
         None

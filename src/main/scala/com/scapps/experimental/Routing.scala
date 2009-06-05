@@ -1,21 +1,30 @@
 package com.scapps.experimental
 
-import scalaz.control.Kleisli
+import scalaz.Kleisli
 import scalaz.{OptionW, StringW}
 import slinky.http.request._
 import slinky.http.response.Response
-import scalaz.list.NonEmptyList._
-import scalaz.list.NonEmptyList
+import scalaz.NonEmptyList._
+import scalaz.NonEmptyList
 import scalaz.OptionW._
 import scalaz.StringW._
-import scalaz.control.MonadW.{EitherMonad, OptionMonad, EitherLeftMonad, ListMonad}
+import scalaz.Monad._
+import scalaz.Scalaz._
 
 object OptionKleisli {
   implicit def OptionKleisli[A, B](f: A => Option[B]): Kleisli[Option, A, B] = Kleisli.kleisli[Option](f)  
 }
 
 object Routing {
-  def firstSome[A, B](fs: List[Kleisli[Option, A, B]])(a: A): Option[B] = join(fs.elements.map(_(a)).find(_.isDefined))
+  //todo put this in scalaz
+  implicit def NonEmptyListList[T](nel : NonEmptyList[T]) : List[T] = nel.list
+  implicit def ListOptionNonEmptyList[T](list : List[T]) : Option[NonEmptyList[T]] = list match {
+    case Nil => None
+    case a :: as => Some(nel(a, as))
+  }
+  
+  
+  def firstSome[A, B](fs: List[Kleisli[Option, A, B]])(a: A): Option[B] = (fs.elements.map(_(a)).find(_.isDefined)).join
 
   implicit def ListKleisliKleisli[A, B](fs: List[Kleisli[Option, A, B]]): Kleisli[Option, A, B] = Kleisli.kleisli[Option](firstSome(fs) _)
 
@@ -25,83 +34,55 @@ object Routing {
 
   implicit def PathMethodKliesli(t: Tuple2[Method, String]) = MethodKliesli(t._1) >=> PathKliesli(t._2)
 
+  def stringToNel(s : String, n : NonEmptyList[Char]) = {
+    if (s.length == 0) n else {
+      val l = s.toList
+      nel(l.head, l.tail)
+    }
+  }
   // returns a new request with the prefix stripped if it matches, else none
   def dir(prefix: String) = {
     def f(prefix: String)(r: Request[Stream]): Option[Request[Stream]] = {
-      OptionW.cond(r.pathStartsWith(prefix), r(r.uri(string(r.path.replaceFirst(prefix, ""), NonEmptyList('/')))))
+      (r.pathStartsWith(prefix)).option(
+        r(r.uri(stringToNel(r.path.list.mkString.replaceFirst(prefix, ""), NonEmptyList.nel('/'))))
+      )
     }
     f(prefix) _
   }
 
 
   // returns a new request with the uri stripped to '/', if it matches exactly, else none
-  def exactdir(s: String) = {
-    def g(s: String)(r: Request[Stream]): Option[Request[Stream]] = cond(r.pathEquals(s), r(r.uri(NonEmptyList('/'))))
+  def exactdir(s: String) : (Request[Stream] => Option[Request[Stream]]) = {
+    def g(s: String)(r: Request[Stream]): Option[Request[Stream]] = (r.pathEquals(s)).option(r(r.uri(NonEmptyList.nel('/'))))
     g(s) _
   }
 
-  def withParam(key: String) = (r: Request[Stream]) => cond(r !? key, r)
+  def withParam(key: String) = (r: Request[Stream]) => (r !? key).option(r)
 
-  def methodM(m: Method) = (r: Request[Stream]) => cond(r.method.equals(m), r)
+  def methodM(m: Method) : (Request[Stream] => Option[Request[Stream]]) = (r: Request[Stream]) => { (r.method.equals(m)).option(r) }
 
   // interprets the value of _method in a post as an HTTP method
   def methodHax = (r: Request[Stream]) => {
-    val mbMeth: Option[Method] = (r | "_method") > (_.mkString) >>= (Method.StringMethod(_))
-    Some((mbMeth > (r(_))) getOrElse (r))
+    val mbMeth: Option[Method] = (r | "_method") |> (_.mkString) >>= (Method.StringMethod(_))
+    Some((mbMeth |> (r(_))) getOrElse (r))
   }
-
 }
+
+import Routing.{ListOptionNonEmptyList,NonEmptyListList}
 
 case class ItemRequest(request: Request[Stream], key: NonEmptyList[Char]) {
-  lazy val longKey: Option[Long] = key.mkString.parseLong.right.toOption
-}
-
-case class RestfulRequest(top : Pair[String, Option[String]], context : List[Pair[String, String]], request : Request[Stream])
-
-object RestfulRequest {
-  private def pairUp[T](list : List[T]) : List[Pair[T, Option[T]]] = {
-    val cs: List[List[T]] = list.foldLeft(List[List[T]]())((l, x) => l match {
-      case Nil => List(x) :: Nil
-      case (List(a) :: tail) => List(a, x) :: tail
-      case b => List(x) :: b
-    })
-
-    val xs = cs map (s => s match {
-      case List(a) => Pair(a, None)
-      case List(a, b) => Pair(a, Some(b))
-    })
-    xs
-  }
-
-  def f[T](p : Pair[T, Option[T]]) = p match {
-    case (a, Some(b)) => Some(a -> b)
-    case _ => None
-  }
-
-  def from(request : Request[Stream]) : Option[RestfulRequest] = {
-    val path: String = request.path.mkString
-    val components : List[String] = path.split("/").toList.filter(!_.isEmpty)
-    val ls = pairUp(components)
-
-    val mbTop = ls.headOption
-    val list: List[Tuple2[String, Option[String]]] = ls.tail
-    if (list.forall(_.isDefined) && mbTop.isDefined) {
-      val rest = OptionW.somes(list map f[String])
-      Some(RestfulRequest(mbTop.get, rest, request))
-    } else {
-      None
-    }
-  }
+  import com.scapps.StringParser._
+  lazy val longKey: Option[Long] = key.mkString.asLong
 }
 
 /*
 /beers/1[/]
 /beers/2/reviews[/]
  */
-object ItemRequest {
+object ItemRequest {  
   def RequestOptionItemRequest(request: Request[Stream]): Option[ItemRequest] = {
-    val sid: Option[NonEmptyList[Char]] = StringW.StringWList(request.path.mkString.split("/")(0))
-    (sid > (ItemRequest(request, _)))
+    val sid: Option[NonEmptyList[Char]] = request.path.mkString.split("/")(0).toList
+    (sid |> (ItemRequest(request, _)))
   }
 }
 

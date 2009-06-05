@@ -1,8 +1,9 @@
 package com.scapps
 
-import scalaz.control._
-import scalaz.list.NonEmptyList
+import scalaz.NonEmptyList
 import scalaz.OptionW
+import scalaz.Kleisli
+import scalaz.Scalaz._
 import slinky.http.request.{POST, Method, Request, GET}
 import slinky.http.servlet.{HttpServlet, HttpServletRequest, ServletApplication, StreamStreamServletApplication}
 import slinky.http.servlet.HttpServlet._
@@ -17,19 +18,15 @@ import com.scapps._
 import com.scapps.experimental.Routing._
 import com.scapps.experimental.OptionKleisli._
 
-import scalaz.control.Kleisli
-
 import slinky.http.request.Request
 
 final class ScappsApplication extends StreamStreamServletApplication {
   object App {
     implicit val charSet = UTF8
-    import scalaz.OptionW.onull
-    import scalaz.javas.Iterator._
 
     def respond(dropApp: DropApp)(implicit request: Request[Stream]) = {
       def f(route: Route)(request: Request[Stream]): Option[Response[Stream]] = {
-        val matchMethod = OptionW.cond(route.m.equals(request.method), request)
+        val matchMethod = (route.m.equals(request.method)).option(request)
         val matchRoute = matchMethod flatMap (r => t.matchRoute(r.path.mkString)(route.parts))
         matchRoute flatMap (m => route.f(ScappsRequest(m, request)))
       }
@@ -53,7 +50,6 @@ final class ScappsApplication extends StreamStreamServletApplication {
         val c = Class.forName(appName)
         if (classOf[DropApp] isAssignableFrom c) {
           a = c.newInstance.asInstanceOf[DropApp]
-          //servlet.servlet.getServletConfig.get
         } else {
           throw new RuntimeException("Specified app class is not assignable from DropApp.")
         }

@@ -1,7 +1,7 @@
 package com.scapps
 
-import scalaz.control._
-import scalaz.list.NonEmptyList
+import scalaz.Scalaz._
+import scalaz.NonEmptyList
 import scalaz.OptionW
 import slinky.http.request.{POST, Method, Request, GET}
 import slinky.http.servlet.{HttpServlet, HttpServletRequest, ServletApplication, StreamStreamServletApplication}
@@ -17,7 +17,7 @@ import scalaz.CharSet._
 import com.scapps._
 import com.scapps.experimental.OptionKleisli._
 
-import scalaz.control.Kleisli
+import scalaz.Kleisli
 
 import com.scapps.experimental.Routing._
 import com.scapps.experimental.OptionKleisli._
@@ -25,7 +25,6 @@ import com.scapps.experimental.OptionKleisli._
 class MyApps extends DropApp {
   import t.imps._
   import DropApp._
-  import scalaz.OptionW.onull
 
   def view[A](title: String, content: A) =
     <html xmlns="http://www.w3.org/1999/xhtml">
@@ -41,10 +40,10 @@ class MyApps extends DropApp {
   object KGoApp extends DropApp {
     val routes = List(
       Route(GET, "beers" / 'id, r => {
-        r.render(view("Beer view", <div>You asked for{r.captures('id)}</div>))
+        Some(r.render(view("Beer view", <div>You asked for{r.captures('id)}</div>)))
       }),
       Route(GET, "beers", r => {
-        r.render(view("Beer list", <div>You asked for NOTHING!</div>))
+        Some(r.render(view("Beer list", <div>You asked for NOTHING!</div>)))
       })
       )
   }
@@ -52,7 +51,7 @@ class MyApps extends DropApp {
   object TheLols extends DropApp {
     val routes = List(
       Route(GET, "lols", r => {
-        r.render(view("Wat", "Scinatra? I barely knows ya!"))
+        Some(r.render(view("Wat", "Scinatra? I barely knows ya!")))
       })
       )
   }
