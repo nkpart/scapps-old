@@ -1,4 +1,4 @@
-package com.scapps
+package com.scapps.utils
 
 import scalaz.Scalaz._
 import scalaz.{Validation, Success, Failure}

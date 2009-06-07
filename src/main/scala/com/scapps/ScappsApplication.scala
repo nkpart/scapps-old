@@ -1,5 +1,8 @@
 package com.scapps
 
+
+
+import drops.{Route, ScappsRequest, DropApp}
 import scalaz.NonEmptyList
 import scalaz.OptionW
 import scalaz.Kleisli
@@ -27,7 +30,7 @@ final class ScappsApplication extends StreamStreamServletApplication {
     def respond(dropApp: DropApp)(implicit request: Request[Stream]) = {
       def f(route: Route)(request: Request[Stream]): Option[Response[Stream]] = {
         val matchMethod = (route.m.equals(request.method)).option(request)
-        val matchRoute = matchMethod flatMap (r => t.matchRoute(r.path.mkString)(route.parts))
+        val matchRoute = matchMethod flatMap (r => DropApp.matchRoute(r.path.list.mkString)(route.parts.parts))
         matchRoute flatMap (m => route.f(ScappsRequest(m, request)))
       }
       val x: List[Kleisli[Option, Request[Stream], Response[Stream]]] = dropApp.routes map (f(_) _)

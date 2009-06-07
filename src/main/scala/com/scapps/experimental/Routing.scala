@@ -16,14 +16,7 @@ object OptionKleisli {
 }
 
 object Routing {
-  //todo put this in scalaz
-  implicit def NonEmptyListList[T](nel : NonEmptyList[T]) : List[T] = nel.list
-  implicit def ListOptionNonEmptyList[T](list : List[T]) : Option[NonEmptyList[T]] = list match {
-    case Nil => None
-    case a :: as => Some(nel(a, as))
-  }
-  
-  
+
   def firstSome[A, B](fs: List[Kleisli[Option, A, B]])(a: A): Option[B] = (fs.elements.map(_(a)).find(_.isDefined)).join
 
   implicit def ListKleisliKleisli[A, B](fs: List[Kleisli[Option, A, B]]): Kleisli[Option, A, B] = Kleisli.kleisli[Option](firstSome(fs) _)
@@ -68,95 +61,4 @@ object Routing {
   }
 }
 
-import Routing.{ListOptionNonEmptyList,NonEmptyListList}
 
-case class ItemRequest(request: Request[Stream], key: NonEmptyList[Char]) {
-  import com.scapps.StringParser._
-  lazy val longKey: Option[Long] = key.mkString.asLong
-}
-
-/*
-/beers/1[/]
-/beers/2/reviews[/]
- */
-object ItemRequest {  
-  def RequestOptionItemRequest(request: Request[Stream]): Option[ItemRequest] = {
-    val sid: Option[NonEmptyList[Char]] = request.path.mkString.split("/")(0).toList
-    (sid |> (ItemRequest(request, _)))
-  }
-}
-
-trait RestfulResource {
-  import Routing._
-  import OptionKleisli.OptionKleisli
-
-  val base: String
-
-  def index(r: Request[Stream]): Option[Response[Stream]]
-
-  def formForCreate(r: Request[Stream]): Option[Response[Stream]]
-
-  def createItem(r: Request[Stream]): Option[Response[Stream]]
-
-  def formForEdit(request: ItemRequest): Option[Response[Stream]]
-
-  def deleteItem(r: ItemRequest): Option[Response[Stream]]
-
-  def updateItem(r: ItemRequest): Option[Response[Stream]]
-
-  def item(r: ItemRequest): Option[Response[Stream]]
-
-  def routes : Kleisli[Option, Request[Stream], Response[Stream]]  = {
-    methodHax >=> dir("/" + base) >=> List(
-      GET >=> List(
-        "/" >=> index _,
-        "/new" >=> formForCreate _,
-        dir("/") >=> withParam("edit") >=> ItemRequest.RequestOptionItemRequest _ >=> formForEdit _,
-        dir("/") >=> ItemRequest.RequestOptionItemRequest _ >=> item _
-        ),
-      PUT >=> dir("/") >=> ItemRequest.RequestOptionItemRequest _ >=> updateItem _,
-      POST >=> "/" >=> createItem _,
-      DELETE >=> dir("/") >=> ItemRequest.RequestOptionItemRequest _ >=> deleteItem _
-      )
-  }
-}
-
-class LoggingResource(logF : (String => Unit), resource : RestfulResource) extends RestfulResource {
-
-  val base: String = resource.base
-
-  def index(r: Request[Stream]): Option[Response[Stream]] = {
-    logF("index")
-    resource.index(r)
-  }
-
-  def formForCreate(r: Request[Stream]): Option[Response[Stream]] = {
-    logF("formForCreate")
-    resource.formForCreate(r)
-  }
-
-  def createItem(r: Request[Stream]): Option[Response[Stream]] = {
-    logF("createItem")
-    resource.createItem(r)
-  }
-
-  def formForEdit(r: ItemRequest): Option[Response[Stream]] = {
-    logF("formForEdit")
-    resource.formForEdit(r)
-  }
-
-  def deleteItem(r: ItemRequest): Option[Response[Stream]] = {
-    logF("deleteItem")
-    resource.deleteItem(r)
-  }
-
-  def updateItem(r: ItemRequest): Option[Response[Stream]] = {
-    logF("updateItem")
-    resource.updateItem(r)
-  }
-
-  def item(r: ItemRequest): Option[Response[Stream]] = {
-    logF("item")
-    resource.item(r)
-  }
-}

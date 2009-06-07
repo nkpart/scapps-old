@@ -1,4 +1,4 @@
-package com.scapps
+package com.scapps.drops
 
 import scalaz.Scalaz._
 import scalaz.NonEmptyList
@@ -33,41 +33,64 @@ object Renderer {
     NotFound(ContentType, "text/html") << transitional << "404 - Not found"
   }
 
-  def respondWith(ct : String, content : String)(implicit r: Request[Stream]) = {
+  def respondWith(ct: String, content: String)(implicit r: Request[Stream]) = {
     OK(ContentType, ct) << content
   }
 }
 
 abstract case class RoutePart()
+
+// consumes route part, must match string exactly
 case class Dir(s: String) extends RoutePart()
+
+// Consumes route part as named capture
 case class Any(name: Symbol) extends RoutePart()
 
-case class RouteLol(parts: List[RoutePart]) {
+case class Parts(parts: List[RoutePart]) {
   def /(r: RoutePart) = {
-    RouteLol(parts + r)
+    Parts(parts + r)
   }
 }
 
-object t {
+// "lists" / 'id
+case class ScappsRequest(captures: Map[Symbol, String], request: Request[Stream]) {
+  implicit val r = request
+
+  def render(a: Elem) = Renderer.render(a)
+
+  def respondWith(ct: String, content: String) = Renderer.respondWith(ct, content)
+}
+
+case class Route(m: Method, parts: Parts, f: (ScappsRequest => Option[Response[Stream]]))
+
+trait DropApp {
+  val routes: List[Route]
+
+  def |(d: DropApp) = {
+    val n = routes ++ d.routes
+    new DropApp {val routes = n}
+  }
+}
+
+object DropApp {
+  implicit def DropAppList(d: DropApp) = d.routes
   import scalaz.OptionW._
 
-  object imps {
-    implicit def RouteLolToListRoute(routelol: RouteLol) = routelol.parts
+  implicit def RouteLolToListRoute(routelol: Parts) = routelol.parts
 
-    implicit def ListToRouteLol(parts: List[RoutePart]) = RouteLol(parts)
+  implicit def ListToRouteLol(parts: List[RoutePart]) = Parts(parts)
 
-    implicit def RouteToRouteLol(rp: RoutePart) = RouteLol(List(rp))
+  implicit def RouteToRouteLol(rp: RoutePart) = Parts(List(rp))
 
-    implicit def StringToRouteLol(rp: String) = RouteLol(List(Dir(rp)))
+  implicit def StringToRouteLol(rp: String) = Parts(List(Dir(rp)))
 
-    implicit def SymbolToRouteLol(rp: Symbol) = RouteLol(List(Any(rp)))
+  implicit def SymbolToRouteLol(rp: Symbol) = Parts(List(Any(rp)))
 
-    implicit def SymbolToPart(s: Symbol) = Any(s)
+  implicit def SymbolToPart(s: Symbol) = Any(s)
 
-    implicit def StringToPart(s: String) = Dir(s)
+  implicit def StringToPart(s: String) = Dir(s)
 
-    implicit def S2LRP(s: String): List[RoutePart] = List(Dir(s))
-  }
+  //implicit def S2LRP(s: String): List[RoutePart] = List(Dir(s))
 
   def pathBits(path: String) = {
     val parts = path.split("/").toList.filter(!_.isEmpty)
@@ -94,30 +117,7 @@ object t {
       }
     })
   }
-}
-// "lists" / 'id
-case class ScappsRequest(captures: Map[Symbol, String], request: Request[Stream]) {
-  implicit val r = request
 
-  def render(a: Elem) = Renderer.render(a)
-
-  def respondWith(ct : String, content : String) = Renderer.respondWith(ct, content)
-}
-
-case class Route(m: Method, parts: List[RoutePart], f: (ScappsRequest => Option[Response[Stream]]))
-
-
-trait DropApp {
-  val routes: List[Route]
-
-  def |(d: DropApp) = {
-    val n = routes ++ d.routes
-    new DropApp {val routes = n}
-  }
-}
-
-object DropApp {
-  implicit def DropAppList(d : DropApp) = d.routes
   def mount(base: String, lols: DropApp): DropApp = {
     new DropApp {
       val routes = (lols.routes map (r => Route(r.m, Dir(base) :: r.parts, r.f)))
