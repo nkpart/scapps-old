@@ -3,6 +3,7 @@ package com.scapps.experimental
 import scalaz.Kleisli
 import scalaz.{OptionW, StringW}
 import slinky.http.request._
+
 import slinky.http.response.Response
 import scalaz.NonEmptyList._
 import scalaz.NonEmptyList
@@ -56,7 +57,8 @@ object Routing {
 
   // interprets the value of _method in a post as an HTTP method
   def methodHax = (r: Request[Stream]) => {
-    val mbMeth: Option[Method] = (r | "_method") |> (_.mkString) >>= (Method.StringMethod(_))
+    import slinky.http.request.Method._
+    val mbMeth: Option[Method] = (r | "_method") >>= (_.mkString : Option[Method])
     Some((mbMeth |> (r(_))) getOrElse (r))
   }
 }

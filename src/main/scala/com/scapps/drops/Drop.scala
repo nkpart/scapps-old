@@ -52,7 +52,6 @@ case class Parts(parts: List[RoutePart]) {
   }
 }
 
-// "lists" / 'id
 case class ScappsRequest(captures: Map[Symbol, String], request: Request[Stream]) {
   implicit val r = request
 
@@ -118,9 +117,10 @@ object DropApp {
     })
   }
 
-  def mount(base: String, lols: DropApp): DropApp = {
+  // Mounts the given app on top of a base path
+  def mount(base: String, app: DropApp): DropApp = {
     new DropApp {
-      val routes = (lols.routes map (r => Route(r.m, Dir(base) :: r.parts, r.f)))
+      val routes = (app.routes map (r => Route(r.m, Dir(base) :: r.parts, r.f)))
     }
   }
 }

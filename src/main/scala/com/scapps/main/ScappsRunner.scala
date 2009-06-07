@@ -5,7 +5,7 @@ import org.eclipse.jetty.server.handler.ContextHandler
 import org.eclipse.jetty.server.{Connector, Handler, Server}
 import org.eclipse.jetty.servlet.{ServletHolder, ServletContextHandler}
 
-object Scapps {
+object ScappsRunner {
   def main(args: Array[String]) {
     val server: Server = new Server(8081)
     val handler: ServletContextHandler = new ServletContextHandler(server, "/", ServletContextHandler.SESSIONS |
